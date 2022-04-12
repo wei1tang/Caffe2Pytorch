@@ -343,14 +343,15 @@ class PriorBox(nn.Module):
     paper, so we include both versions, but note v2 is the most tested and most
     recent version of the paper.
     """
-    def __init__(self, min_size, max_size, aspects, clip, flip, step, offset, variances):
+    def __init__(self, min_size, max_size, aspects, clip, flip, step_h, step_w, offset, variances):
         super(PriorBox, self).__init__()
         self.min_size = min_size
         self.max_size = max_size
         self.aspects = aspects
         self.clip = clip
         self.flip = flip
-        self.step = step
+        self.step_h = step_h
+        self.step_w = step_w
         self.offset = offset
         self.variances = variances
         
@@ -366,8 +367,8 @@ class PriorBox(nn.Module):
         for j in range(feature_height):
             for i in range(feature_width):
                 # unit center x,y
-                cx = (i + self.offset) * self.step / image_width
-                cy = (j + self.offset) * self.step / image_height
+                cx = (i + self.offset) * self.step_w / image_width
+                cy = (j + self.offset) * self.step_h / image_height
                 mw = float(self.min_size)/image_width
                 mh = float(self.min_size)/image_height
                 mean += [cx-mw/2.0, cy-mh/2.0, cx+mw/2.0, cy+mh/2.0]
@@ -400,7 +401,7 @@ class PriorBox(nn.Module):
             return Variable(output)
 
     def __repr__(self):
-        return 'PriorBox(min_size=%f, max_size=%f, clip=%d, flip=%d, step=%d, offset=%f, variances=%s)' % (self.min_size, self.max_size, self.clip, self.flip, self.step, self.offset, self.variances)
+        return 'PriorBox(min_size=%f, max_size=%f, clip=%d, flip=%d, step_h=%d, step_w=%d, offset=%f, variances=%s)' % (self.min_size, self.max_size, self.clip, self.flip, self.step_h, self.step_w, self.offset, self.variances)
 
         
 class CaffeNet(nn.Module):
@@ -929,16 +930,24 @@ class CaffeNet(nn.Module):
                 if 'aspect_ratio' in layer['prior_box_param']:
                     print(layer['prior_box_param']['aspect_ratio'])
                     aspects = layer['prior_box_param']['aspect_ratio']
-                    aspects = [float(aspect) for aspect in aspects]
+                    if isinstance(aspects, list): 
+                       aspects = [float(aspect) for aspect in aspects]
+                    if isinstance(aspects, str):
+                       aspects = [float(aspects)]
                 clip = (layer['prior_box_param']['clip'] == 'true')
                 flip = False
                 if 'flip' in layer['prior_box_param']:
                     flip = (layer['prior_box_param']['flip'] == 'true')
-                step = int(layer['prior_box_param']['step'])
+                if 'step' in layer['prior_box_param']:
+                    step_h = int(float(layer['prior_box_param']['step']))
+                    step_w = int(float(layer['prior_box_param']['step']))
+                else:
+                    step_h = int(float(layer['prior_box_param']['step_h']))
+                    step_w = int(float(layer['prior_box_param']['step_w']))
                 offset = float(layer['prior_box_param']['offset'])
                 variances = layer['prior_box_param']['variance']
                 variances = [float(v) for v in variances]
-                models[lname] = PriorBox(min_size, max_size, aspects, clip, flip, step, offset, variances)
+                models[lname] = PriorBox(min_size, max_size, aspects, clip, flip, step_h, step_w, offset, variances)
                 blob_channels[tname] = 1
                 blob_width[tname] = 1
                 blob_height[tname] = 1
